@@ -36,7 +36,7 @@ define new_line
 
 endef
 
-.PHONY: hcd hcdev hcadmin bs test deps work pub
+.PHONY: hcd hcdev hcadmin bs test deps v8 work pub
 # Anything which requires deps should end with: gx-go rewrite --undo
 
 all: deps
@@ -57,8 +57,14 @@ bs: deps
 test: deps
 	$(foreach pkg_path,$(go_packages),go get -d -t $(pkg_path) && go test $(TEST_FLAGS) $(pkg_path)${new_line})
 	gx-go rewrite --undo
-deps: $(GOBIN)/gx $(GOBIN)/gx-go
+deps: v8 $(GOBIN)/gx $(GOBIN)/gx-go
 	gx-go get $(REPO)
+v8:
+	go get github.com/augustoroman/v8 > /dev/null 2>&1 || true
+	cp v8build.bash ${GOPATH}/src/github.com/augustoroman/v8
+	cd ${GOPATH}/src/github.com/augustoroman/v8; ./v8build.bash
+	cd ${GOPATH}/src/github.com/augustoroman/v8; ./symlink.sh ${GOPATH}/src/github.com/augustoroman/v8/build-v8/v8 || true
+	go get github.com/augustoroman/v8
 $(GOBIN)/gx:
 	go get -u github.com/whyrusleeping/gx
 $(GOBIN)/gx-go:

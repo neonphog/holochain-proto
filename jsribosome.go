@@ -9,9 +9,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/augustoroman/v8"
 	. "github.com/holochain/holochain-proto/hash"
 	peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/robertkrimen/otto"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -585,8 +587,43 @@ func makeOttoObjectFromGetResp(h *Holochain, jsr *JSRibosome, getResp *GetResp) 
 	return
 }
 
+func AddAllNumbers(in v8.CallbackArgs) (*v8.Value, error) {
+	if len(in.Args) < 2 {
+		return nil, fmt.Errorf("add requires at least 2 numbers, but got %d args", len(in.Args))
+	}
+	result := 0.0
+	for i, arg := range in.Args {
+		fmt.Println("%%%% v8-debug %%%% - arg", arg.String())
+		n, err := strconv.ParseFloat(arg.String(), 64)
+		if err != nil {
+			return nil, fmt.Errorf("Arg %d [%q] cannot be parsed as a number: %v", i, arg.String(), err)
+		}
+		result += n
+	}
+	return in.Context.Create(result)
+}
+
 // NewJSRibosome factory function to build a javascript execution environment for a zome
 func NewJSRibosome(h *Holochain, zome *Zome) (n Ribosome, err error) {
+	// -- begin v8 test -- //
+	v8_ctx := v8.NewIsolate().NewContext()
+	v8_ctx.Eval(`
+    // yay v8
+    add = (a, b) => { return a + b };
+  `, "add.js")
+
+	v8_res, _ := v8_ctx.Eval(`add(3, 4)`, "compute.js")
+	fmt.Println("%%%% v8-test %%%% add(3, 4) =", v8_res.String())
+
+	v8_add_all := v8_ctx.Bind("add_all", AddAllNumbers)
+	if err := v8_ctx.Global().Set("add_all", v8_add_all); err != nil {
+		panic(err)
+	}
+
+	v8_res, _ = v8_ctx.Eval(`add_all(1,2,3,4,5)`, "bind.js")
+	fmt.Println("%%%% v8-test %%%% add_all(1,2,3,4,5) =", v8_res.String())
+	// --   end v8 test -- //
+
 	jsr := JSRibosome{
 		h:    h,
 		zome: zome,
